@@ -1,5 +1,6 @@
-﻿import React, { useState } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { Menu, X, Plus, Edit2, Trash2, Save, LogOut, Users, Target, MapPin, Bot } from 'lucide-react';
+import AdminMembershipSection from './AdminMembershipSection';
 
 const YSPWebsite = () => {
   const [currentPage, setCurrentPage] = useState('home');
@@ -11,18 +12,34 @@ const YSPWebsite = () => {
   const [showLogin, setShowLogin] = useState(false);
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
-  const [programs, setPrograms] = useState([]);
+  const [programs, setPrograms] = useState(() => {
+    const savedPrograms = localStorage.getItem('programs');
+    return savedPrograms ? JSON.parse(savedPrograms) : [];
+  });
+
+  // Save programs to localStorage whenever they change
+  useEffect(() => {
+    localStorage.setItem('programs', JSON.stringify(programs));
+  }, [programs]);
+
   const [chapters, setChapters] = useState([]);
   const [opportunities, setOpportunities] = useState([]);
-  const [newProgram, setNewProgram] = useState({ title: '', description: '' });
+  const [newProgram, setNewProgram] = useState({ title: '', description: '', image: null });
+  const [programImagePreview, setProgramImagePreview] = useState(null);
   const [editingProgram, setEditingProgram] = useState(null);
+  const [selectedProgram, setSelectedProgram] = useState(null);
+  const [showProgramDetail, setShowProgramDetail] = useState(false);
   const [newOpportunity, setNewOpportunity] = useState({ eventName: '', date: '', location: '', description: '' });
   const [editingOpportunity, setEditingOpportunity] = useState(null);
   const [showChat, setShowChat] = useState(false);
   const [chatMessages, setChatMessages] = useState([
-    { id: 1, text: 'Hello! How can I help you today?', sender: 'bot' }
+    { id: 1, text: "Mabuhay! I'm Bayani, your friendly assistant. How can I help you today?", sender: 'bot' }
   ]);
   const [userInput, setUserInput] = useState('');
+  const [memberApplications, setMemberApplications] = useState([]);
+  const [applicantName, setApplicantName] = useState('');
+  const [applicantEmail, setApplicantEmail] = useState('');
+  const [applicationSubmitted, setApplicationSubmitted] = useState(false);
 
   const handlePageChange = (page) => {
     setIsLoading(true);
@@ -34,8 +51,23 @@ const YSPWebsite = () => {
 
   const addProgram = () => {
     if (newProgram.title.trim()) {
+      console.log('Adding program with image:', newProgram.image ? 'Yes' : 'No');
+      console.log('Program data:', newProgram);
       setPrograms([...programs, { id: Date.now(), ...newProgram }]);
-      setNewProgram({ title: '', description: '' });
+      setNewProgram({ title: '', description: '', image: null });
+      setProgramImagePreview(null);
+    }
+  };
+
+  const handleProgramImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setProgramImagePreview(reader.result);
+        setNewProgram({ ...newProgram, image: reader.result });
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -100,6 +132,22 @@ const YSPWebsite = () => {
       setCurrentPage('home');
       setAuthLoading(false);
     }, 1000);
+  };
+
+  const handleMembershipApplication = () => {
+    if (applicantName.trim() && applicantEmail.trim()) {
+      const newApplication = {
+        id: Date.now(),
+        name: applicantName,
+        email: applicantEmail,
+        status: 'pending',
+        submittedAt: new Date().toISOString()
+      };
+      setMemberApplications([...memberApplications, newApplication]);
+      setApplicationSubmitted(true);
+      setApplicantName('');
+      setApplicantEmail('');
+    }
   };
 
   const getBotResponse = (userMessage) => {
@@ -213,7 +261,7 @@ const YSPWebsite = () => {
         <div className="fixed inset-0 bg-white bg-opacity-90 flex items-center justify-center z-50">
           <div className="flex flex-col items-center">
             <div className="animate-spin rounded-full h-16 w-16 border-4 border-amber-600 border-t-transparent"></div>
-            <p className="mt-4 text-gray-700 font-semibold">Loading...</p>
+            <p className="mt-4 text-gray-700 font-semibold">Loading in Please wait...</p>
           </div>
         </div>
       )}
@@ -228,7 +276,7 @@ const YSPWebsite = () => {
               {authLoading ? (
                 <>
                   <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
-                  <span>Signing in...</span>
+                  <span>Signing you in...</span>
                 </>
               ) : (
                 'Sign In'
@@ -295,12 +343,41 @@ const YSPWebsite = () => {
               </div>
               <div className="grid md:grid-cols-3 gap-8">
                 {programs.length > 0 ? (
-                  programs.map((prog) => (
-                    <div key={prog.id} className="bg-white rounded-lg shadow-md p-6 border-2 border-transparent hover:border-amber-500 transition-all cursor-pointer">
-                      <h4 className="text-xl font-semibold text-amber-700 mb-2">{prog.title}</h4>
-                      <p className="text-gray-600">{prog.description}</p>
+                  programs.map((prog) => {
+                    console.log('Rendering program:', prog.title, 'Has image:', prog.image ? 'Yes' : 'No');
+                    return (
+                    <div 
+                      key={prog.id} 
+                      className="bg-white rounded-lg shadow-md overflow-hidden border-2 border-transparent hover:border-amber-500 transition-all cursor-pointer"
+                      onClick={() => {
+                        setSelectedProgram(prog);
+                        setShowProgramDetail(true);
+                      }}
+                    >
+                      {prog.image && (
+                        <img 
+                          src={prog.image} 
+                          alt={prog.title}
+                          className="w-full h-48 object-cover"
+                        />
+                      )}
+                      <div className="p-6">
+                        <h4 className="text-xl font-semibold text-amber-700 mb-2">{prog.title}</h4>
+                        <p className="text-gray-600 mb-4">{prog.description}</p>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedProgram(prog);
+                            setShowProgramDetail(true);
+                          }}
+                          className="bg-amber-600 text-white px-4 py-2 rounded-lg hover:bg-amber-700 transition-colors font-semibold"
+                        >
+                          Learn More
+                        </button>
+                      </div>
                     </div>
-                  ))
+                    );
+                  })
                 ) : (
                   <div className="col-span-3 text-center text-gray-500">No programs yet. Check back soon!</div>
                 )}
@@ -315,10 +392,16 @@ const YSPWebsite = () => {
                 <h3 className="text-2xl md:text-4xl font-bold mb-4">Want to Start a Chapter?</h3>
                 <p className="text-base md:text-xl mb-6 max-w-2xl mx-auto">Join us in creating a local chapter of Youth Service Philippines in your area and make a difference in your community.</p>
                 <div className="flex flex-col sm:flex-row justify-center gap-4">
-                  <button onClick={() => window.open('https://forms.gle/cWPsgBJKLaQoLuUr8?fbclid=IwY2xjawOKRLJleHRuA2FlbQIxMABicmlkETFJWDhJY0U1azBWMDFLOXh2c3J0YwZhcHBfaWQQMjIyMDM5MTc4ODIwMDg5MgABHm01_q8ZFNsR30YIkD2ODzju7eleolSNiJgUoZKW11PV7HAc0NeXszwCRjFU_aem_2mVtlAdu6_smAMkowigvAA')} className="bg-white text-amber-700 px-6 md:px-8 py-3 rounded-lg font-semibold hover:bg-gray-100 transition shadow-lg">Create a Chapter</button>
+                  {isLoggedIn && userRole === 'admin' && (
+                    <button onClick={() => window.open('https://forms.gle/cWPsgBJKLaQoLuUr8?fbclid=IwY2xjawOKRLJleHRuA2FlbQIxMABicmlkETFJWDhJY0U1azBWMDFLOXh2c3J0YwZhcHBfaWQQMjIyMDM5MTc4ODIwMDg5MgABHm01_q8ZFNsR30YIkD2ODzju7eleolSNiJgUoZKW11PV7HAc0NeXszwCRjFU_aem_2mVtlAdu6_smAMkowigvAA')} className="bg-white text-amber-700 px-6 md:px-8 py-3 rounded-lg font-semibold hover:bg-gray-100 transition shadow-lg">Create a Chapter</button>
+                  )}
                   <button onClick={() => setCurrentPage('membership')} className="bg-transparent border-2 border-white text-white px-6 md:px-8 py-3 rounded-lg font-semibold hover:bg-white hover:text-amber-700 transition shadow-lg">Join as Member</button>
                 </div>
-                <p className="text-xs md:text-sm text-amber-100 mt-4 md:mt-6">Our admin team will review your application and notify you shortly.</p>
+                <p className="text-xs md:text-sm text-amber-100 mt-4 md:mt-6">
+                  {isLoggedIn && userRole === 'admin' 
+                    ? 'As an admin, you can create new chapters for the organization.' 
+                    : 'Chapter creation is restricted to administrators only. Please contact our team for assistance.'}
+                </p>
               </div>
             </div>
           </section>
@@ -326,55 +409,151 @@ const YSPWebsite = () => {
       )}
 
       {currentPage === 'programs' && (
-        <div className="py-8 md:py-16">
+        <div className="py-8 md:py-16 bg-gradient-to-br from-gray-50 to-amber-50">
           <div className="max-w-7xl mx-auto px-4">
-            <h2 className="text-2xl md:text-4xl font-bold text-gray-800 mb-6 md:mb-8">Our Programs</h2>
-            <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-8">
-              {programs.length > 0 ? programs.map(p => <div key={p.id} className="bg-white rounded-lg shadow-md p-4 md:p-6"><h3 className="text-lg md:text-xl font-semibold">{p.title}</h3><p className="text-sm md:text-base">{p.description}</p></div>) : <p className="text-gray-600">No programs yet.</p>}
+            <h2 className="text-2xl md:text-4xl font-bold text-gray-800 mb-6 md:mb-8 text-center">Our Programs</h2>
+            <div className="grid sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {programs.length > 0 ? (
+                programs.map(p => (
+                  <div key={p.id} className="bg-white rounded-xl shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1 overflow-hidden border border-gray-100">
+                    {p.image && (
+                      <img 
+                        src={p.image} 
+                        alt={p.title}
+                        className="w-full h-48 object-cover"
+                      />
+                    )}
+                    <div className="h-2 bg-gradient-to-r from-amber-500 to-orange-600"></div>
+                    <div className="p-6">
+                      <div className="flex items-center gap-3 mb-4">
+                        <div className="bg-amber-100 rounded-full p-2">
+                          <Target className="text-amber-600" size={24} />
+                        </div>
+                        <h3 className="text-xl font-bold text-gray-800">{p.title}</h3>
+                      </div>
+                      <p className="text-gray-600 leading-relaxed">{p.description}</p>
+                      <button 
+                        onClick={() => {
+                          setSelectedProgram(p);
+                          setShowProgramDetail(true);
+                        }}
+                        className="mt-4 w-full bg-gradient-to-r from-amber-500 to-orange-600 text-white py-2 px-4 rounded-lg hover:from-amber-600 hover:to-orange-700 transition-all font-semibold"
+                      >
+                        Learn More
+                      </button>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="col-span-full text-center py-12">
+                  <Target className="text-gray-300 mx-auto mb-4" size={64} />
+                  <p className="text-gray-500 text-lg">No programs yet. Check back soon!</p>
+                </div>
+              )}
             </div>
           </div>
         </div>
       )}
 
       {currentPage === 'membership' && (
-        <div className="py-8 md:py-16">
+        <div className="py-8 md:py-16 bg-gradient-to-br from-purple-50 to-pink-50">
           <div className="max-w-7xl mx-auto px-4">
-            <h2 className="text-2xl md:text-4xl font-bold text-gray-800 mb-6 md:mb-8">Join Us</h2>
-            <div className="bg-white rounded-lg shadow-lg p-6 md:p-8">
-              <h3 className="text-xl md:text-2xl font-bold text-amber-700 mb-4">Become a Member</h3>
-              <p className="text-sm md:text-base text-gray-700 mb-6">Join our community of passionate youth volunteers.</p>
-              <button onClick={() => window.open('https://docs.google.com/forms/d/e/1FAIpQLSdwMKgIjQNrlLH-j-Qdx0MrKxefxaLRC6gMI_oOgMTosDi_sQ/viewform')} className="w-full sm:w-auto bg-amber-600 text-white px-6 md:px-8 py-3 rounded-lg hover:bg-amber-700 transition shadow-lg">Get Started</button>
+            <h2 className="text-2xl md:text-4xl font-bold text-gray-800 mb-6 md:mb-8 text-center">Join Us</h2>
+            <div className="max-w-2xl mx-auto bg-white rounded-xl shadow-lg p-6 md:p-8 border border-gray-100">
+              <h3 className="text-xl md:text-2xl font-bold text-amber-700 mb-4 text-center">Become a Member</h3>
+              <p className="text-sm md:text-base text-gray-700 mb-6 text-center">Join our community of passionate youth volunteers. Please provide your details below to start your application.</p>
+
+              {!applicationSubmitted ? (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
+                    <input
+                      type="text"
+                      value={applicantName}
+                      onChange={(e) => setApplicantName(e.target.value)}
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition"
+                      placeholder="Enter your full name"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
+                    <input
+                      type="email"
+                      value={applicantEmail}
+                      onChange={(e) => setApplicantEmail(e.target.value)}
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition"
+                      placeholder="Enter your email address"
+                    />
+                  </div>
+                  <button 
+                    onClick={handleMembershipApplication}
+                    className="w-full bg-gradient-to-r from-amber-500 to-orange-600 text-white py-3 rounded-lg font-semibold hover:from-amber-600 hover:to-orange-700 transition-all shadow-md hover:shadow-lg"
+                  >
+                    Submit Application
+                  </button>
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <div className="bg-green-100 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+                    <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <h4 className="text-xl font-bold text-gray-800 mb-2">Application Submitted!</h4>
+                  <p className="text-gray-600 mb-4">Thank you for your interest! Your application is being reviewed by our team. Once approved, you will receive an email with the link to complete your registration.</p>
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                    <p className="text-sm text-amber-800">
+                      <strong>Note:</strong> Please check your email regularly for updates on your application status.
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
       )}
 
       {currentPage === 'opportunities' && (
-        <div className="py-16">
+        <div className="py-8 md:py-16 bg-gradient-to-br from-blue-50 to-indigo-50">
           <div className="max-w-7xl mx-auto px-4">
-            <h2 className="text-4xl font-bold text-gray-800 mb-8">Volunteer Opportunities</h2>
-            <div className="space-y-6">
+            <h2 className="text-2xl md:text-4xl font-bold text-gray-800 mb-6 md:mb-8 text-center">Volunteer Opportunities</h2>
+            <div className="grid sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {opportunities.length > 0 ? opportunities.map(o => (
-                <div key={o.id} className="bg-white rounded-lg shadow-lg p-6 hover:shadow-xl transition">
-                  <h3 className="text-2xl font-bold text-amber-700 mb-3">{o.eventName}</h3>
-                  <div className="flex items-center gap-4 text-gray-700 mb-2">
-                    <span className="flex items-center gap-1">
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
-                      {o.date}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                      </svg>
-                      {o.location}
-                    </span>
+                <div key={o.id} className="bg-white rounded-xl shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1 overflow-hidden border border-gray-100">
+                  <div className="h-2 bg-gradient-to-r from-blue-500 to-indigo-600"></div>
+                  <div className="p-6">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="bg-blue-100 rounded-full p-2">
+                        <MapPin className="text-blue-600" size={24} />
+                      </div>
+                      <h3 className="text-xl font-bold text-gray-800">{o.eventName}</h3>
+                    </div>
+                    <div className="space-y-3 mb-4">
+                      <div className="flex items-center gap-2 text-gray-600">
+                        <div className="bg-gray-100 rounded-full p-1">
+                          <Target className="text-gray-500" size={16} />
+                        </div>
+                        <span className="text-sm">{o.date}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-gray-600">
+                        <div className="bg-gray-100 rounded-full p-1">
+                          <MapPin className="text-gray-500" size={16} />
+                        </div>
+                        <span className="text-sm">{o.location}</span>
+                      </div>
+                    </div>
+                    <p className="text-gray-600 leading-relaxed mb-4">{o.description}</p>
+                    <button className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white py-2 px-4 rounded-lg hover:from-blue-600 hover:to-indigo-700 transition-all font-semibold">
+                      Apply Now
+                    </button>
                   </div>
-                  <p className="text-gray-600">{o.description}</p>
                 </div>
-              )) : <p className="text-gray-600">No opportunities yet.</p>}
+              )) : (
+                <div className="col-span-full text-center py-12">
+                  <MapPin className="text-gray-300 mx-auto mb-4" size={64} />
+                  <p className="text-gray-500 text-lg">No opportunities yet. Check back soon!</p>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -455,6 +634,11 @@ const YSPWebsite = () => {
               </div>
             </div>
             
+            <AdminMembershipSection 
+              memberApplications={memberApplications} 
+              setMemberApplications={setMemberApplications} 
+            />
+
             <div className="grid md:grid-cols-2 gap-6 md:gap-8 mb-8">
               <div className="bg-white rounded-xl shadow-lg p-6 md:p-8 border border-gray-100">
                 <div className="flex items-center gap-3 mb-6">
@@ -482,6 +666,64 @@ const YSPWebsite = () => {
                       onChange={(e) => setNewProgram({ ...newProgram, description: e.target.value })}
                       className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition h-24 resize-none"
                     />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Program Image</label>
+                    <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg hover:border-amber-500 transition-colors">
+                      <div className="space-y-1 text-center">
+                        {programImagePreview ? (
+                          <div className="relative">
+                            <img 
+                              src={programImagePreview} 
+                              alt="Program preview" 
+                              className="max-h-40 mx-auto rounded-lg"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setProgramImagePreview(null);
+                                setNewProgram({ ...newProgram, image: null });
+                              }}
+                              className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition"
+                            >
+                              <X size={16} />
+                            </button>
+                          </div>
+                        ) : (
+                          <>
+                            <svg
+                              className="mx-auto h-12 w-12 text-gray-400"
+                              stroke="currentColor"
+                              fill="none"
+                              viewBox="0 0 48 48"
+                              aria-hidden="true"
+                            >
+                              <path
+                                d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02"
+                                strokeWidth={2}
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                            </svg>
+                            <div className="flex text-sm text-gray-600">
+                              <label htmlFor="program-image-upload" className="relative cursor-pointer bg-white rounded-md font-medium text-amber-600 hover:text-amber-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-amber-500">
+                                <span>Upload a file</span>
+                                <input
+                                  id="program-image-upload"
+                                  name="program-image-upload"
+                                  type="file"
+                                  accept="image/*"
+                                  className="sr-only"
+                                  onChange={handleProgramImageUpload}
+                                />
+                              </label>
+                              <p className="pl-1">or drag and drop</p>
+                            </div>
+                            <p className="text-xs text-gray-500">PNG, JPG, GIF up to 10MB</p>
+                          </>
+                        )}
+                      </div>
+                    </div>
                   </div>
                   <button onClick={addProgram} className="w-full bg-gradient-to-r from-amber-500 to-orange-600 text-white py-3 rounded-lg font-semibold flex items-center justify-center gap-2 hover:from-amber-600 hover:to-orange-700 transition-all shadow-md hover:shadow-lg">
                     <Plus size={20} /> Add Program
@@ -519,6 +761,13 @@ const YSPWebsite = () => {
                           </div>
                         ) : (
                           <>
+                            {prog.image && (
+                              <img 
+                                src={prog.image} 
+                                alt={prog.title}
+                                className="w-full h-32 object-cover rounded-lg mb-3"
+                              />
+                            )}
                             <h4 className="font-bold text-lg text-gray-800 mb-2">{prog.title}</h4>
                             <p className="text-gray-600 text-sm mb-3 line-clamp-2">{prog.description}</p>
                             <div className="flex gap-2">
@@ -691,8 +940,8 @@ const YSPWebsite = () => {
       {showChat && currentPage !== 'admin' && (
         <div className="fixed bottom-24 right-8 w-96 bg-white rounded-lg shadow-2xl z-50 flex flex-col" style={{maxHeight: '500px'}}>
           <div className="bg-orange-600 text-white p-4 rounded-t-lg">
-            <h3 className="font-bold text-lg">YSP Assistant</h3>
-            <p className="text-sm text-orange-100">How can I help you today?</p>
+            <h3 className="font-bold text-lg">Bayani</h3>
+            <p className="text-sm text-orange-100">Your friendly assistant</p>
           </div>
           <div className="flex-1 overflow-y-auto p-4 space-y-3" style={{maxHeight: '350px'}}>
             {chatMessages.map((msg) => (
@@ -777,6 +1026,40 @@ const YSPWebsite = () => {
           </div>
         </div>
       </footer>
+
+      {/* Program Detail Modal */}
+      {showProgramDetail && selectedProgram && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-gray-200 p-4 flex justify-between items-center">
+              <h2 className="text-2xl font-bold text-gray-800">{selectedProgram.title}</h2>
+              <button
+                onClick={() => {
+                  setShowProgramDetail(false);
+                  setSelectedProgram(null);
+                }}
+                className="text-gray-500 hover:text-gray-700 transition"
+              >
+                <X size={24} />
+              </button>
+            </div>
+            <div className="p-6">
+              {console.log('Modal - Program:', selectedProgram.title, 'Has image:', selectedProgram.image ? 'Yes' : 'No')}
+              {selectedProgram.image && (
+                <img
+                  src={selectedProgram.image}
+                  alt={selectedProgram.title}
+                  className="w-full h-64 md:h-96 object-cover rounded-lg mb-6"
+                />
+              )}
+              <div className="prose max-w-none">
+                <h3 className="text-xl font-semibold text-gray-800 mb-4">About This Program</h3>
+                <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">{selectedProgram.description}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

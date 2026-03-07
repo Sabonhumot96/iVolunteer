@@ -22,7 +22,16 @@ const YSPWebsite = () => {
     localStorage.setItem('programs', JSON.stringify(programs));
   }, [programs]);
 
-  const [chapters, setChapters] = useState([]);
+  const [chapters, setChapters] = useState(() => {
+    const savedChapters = localStorage.getItem('chapters');
+    return savedChapters ? JSON.parse(savedChapters) : [];
+  });
+
+  // Save chapters to localStorage whenever they change
+  useEffect(() => {
+    localStorage.setItem('chapters', JSON.stringify(chapters));
+  }, [chapters]);
+
   const [opportunities, setOpportunities] = useState([]);
   const [newProgram, setNewProgram] = useState({ title: '', description: '', image: null });
   const [programImagePreview, setProgramImagePreview] = useState(null);
@@ -31,15 +40,29 @@ const YSPWebsite = () => {
   const [showProgramDetail, setShowProgramDetail] = useState(false);
   const [newOpportunity, setNewOpportunity] = useState({ eventName: '', date: '', location: '', description: '' });
   const [editingOpportunity, setEditingOpportunity] = useState(null);
+  const [newChapter, setNewChapter] = useState({ name: '', location: '', description: '' });
+  const [editingChapter, setEditingChapter] = useState(null);
   const [showChat, setShowChat] = useState(false);
   const [chatMessages, setChatMessages] = useState([
-    { id: 1, text: "Mabuhay! I'm Bayani, your friendly assistant. How can I help you today?", sender: 'bot' }
+    { id: 1, text: "Hello! I'm Bayani, your friendly assistant. How can I help you today?", sender: 'bot' }
   ]);
   const [userInput, setUserInput] = useState('');
   const [memberApplications, setMemberApplications] = useState([]);
   const [applicantName, setApplicantName] = useState('');
   const [applicantEmail, setApplicantEmail] = useState('');
   const [applicationSubmitted, setApplicationSubmitted] = useState(false);
+  const [chapterApplications, setChapterApplications] = useState(() => {
+    const savedChapterApplications = localStorage.getItem('chapterApplications');
+    return savedChapterApplications ? JSON.parse(savedChapterApplications) : [];
+  });
+  const [newChapterApplication, setNewChapterApplication] = useState({ name: '', location: '', description: '', applicantName: '', applicantEmail: '' });
+  const [showChapterApplicationForm, setShowChapterApplicationForm] = useState(false);
+  const [chapterApplicationSubmitted, setChapterApplicationSubmitted] = useState(false);
+
+  // Save chapter applications to localStorage whenever they change
+  useEffect(() => {
+    localStorage.setItem('chapterApplications', JSON.stringify(chapterApplications));
+  }, [chapterApplications]);
 
   const handlePageChange = (page) => {
     setIsLoading(true);
@@ -100,6 +123,62 @@ const YSPWebsite = () => {
 
   const deleteOpportunity = (id) => {
     setOpportunities(opportunities.filter(o => o.id !== id));
+  };
+
+  const addChapter = () => {
+    if (newChapter.name.trim() && newChapter.location.trim()) {
+      setChapters([...chapters, { id: Date.now(), ...newChapter }]);
+      setNewChapter({ name: '', location: '', description: '' });
+    }
+  };
+
+  const updateChapter = (id, updated) => {
+    setChapters(chapters.map(c => c.id === id ? { ...c, ...updated } : c));
+  };
+
+  const saveChapter = (id) => {
+    setEditingChapter(null);
+  };
+
+  const deleteChapter = (id) => {
+    setChapters(chapters.filter(c => c.id !== id));
+  };
+
+  const handleChapterApplication = () => {
+    if (newChapterApplication.name.trim() && newChapterApplication.location.trim() && newChapterApplication.applicantName.trim() && newChapterApplication.applicantEmail.trim()) {
+      const newApplication = {
+        id: Date.now(),
+        ...newChapterApplication,
+        status: 'pending',
+        submittedAt: new Date().toISOString()
+      };
+      setChapterApplications([...chapterApplications, newApplication]);
+      setChapterApplicationSubmitted(true);
+      setNewChapterApplication({ name: '', location: '', description: '', applicantName: '', applicantEmail: '' });
+    }
+  };
+
+  const approveChapterApplication = (id) => {
+    const application = chapterApplications.find(app => app.id === id);
+    if (application) {
+      // Add to chapters
+      setChapters([...chapters, {
+        id: Date.now(),
+        name: application.name,
+        location: application.location,
+        description: application.description
+      }]);
+      // Update application status
+      setChapterApplications(chapterApplications.map(app => 
+        app.id === id ? { ...app, status: 'approved' } : app
+      ));
+    }
+  };
+
+  const rejectChapterApplication = (id) => {
+    setChapterApplications(chapterApplications.map(app => 
+      app.id === id ? { ...app, status: 'rejected' } : app
+    ));
   };
 
   const handleLogin = () => {
@@ -261,7 +340,7 @@ const YSPWebsite = () => {
         <div className="fixed inset-0 bg-white bg-opacity-90 flex items-center justify-center z-50">
           <div className="flex flex-col items-center">
             <div className="animate-spin rounded-full h-16 w-16 border-4 border-amber-600 border-t-transparent"></div>
-            <p className="mt-4 text-gray-700 font-semibold">Loading in Please wait...</p>
+            <p className="mt-4 text-gray-700 font-semibold">Loading. Please wait...</p>
           </div>
         </div>
       )}
@@ -392,8 +471,10 @@ const YSPWebsite = () => {
                 <h3 className="text-2xl md:text-4xl font-bold mb-4">Want to Start a Chapter?</h3>
                 <p className="text-base md:text-xl mb-6 max-w-2xl mx-auto">Join us in creating a local chapter of Youth Service Philippines in your area and make a difference in your community.</p>
                 <div className="flex flex-col sm:flex-row justify-center gap-4">
-                  {isLoggedIn && userRole === 'admin' && (
+                  {isLoggedIn && userRole === 'admin' ? (
                     <button onClick={() => window.open('https://forms.gle/cWPsgBJKLaQoLuUr8?fbclid=IwY2xjawOKRLJleHRuA2FlbQIxMABicmlkETFJWDhJY0U1azBWMDFLOXh2c3J0YwZhcHBfaWQQMjIyMDM5MTc4ODIwMDg5MgABHm01_q8ZFNsR30YIkD2ODzju7eleolSNiJgUoZKW11PV7HAc0NeXszwCRjFU_aem_2mVtlAdu6_smAMkowigvAA')} className="bg-white text-amber-700 px-6 md:px-8 py-3 rounded-lg font-semibold hover:bg-gray-100 transition shadow-lg">Create a Chapter</button>
+                  ) : (
+                    <button onClick={() => setShowChapterApplicationForm(true)} className="bg-white text-amber-700 px-6 md:px-8 py-3 rounded-lg font-semibold hover:bg-gray-100 transition shadow-lg">Apply to Start a Chapter</button>
                   )}
                   <button onClick={() => setCurrentPage('membership')} className="bg-transparent border-2 border-white text-white px-6 md:px-8 py-3 rounded-lg font-semibold hover:bg-white hover:text-amber-700 transition shadow-lg">Join as Member</button>
                 </div>
@@ -405,6 +486,37 @@ const YSPWebsite = () => {
               </div>
             </div>
           </section>
+
+          {/* Existing Chapters Section */}
+          {chapters.length > 0 && (
+            <section className="py-16 bg-gray-50">
+              <div className="max-w-7xl mx-auto px-4">
+                <div className="text-center mb-12">
+                  <h3 className="text-4xl font-bold text-gray-800 mb-4">Our Chapters</h3>
+                  <p className="text-lg text-gray-600 max-w-3xl mx-auto">Join a local chapter near you and start making a difference in your community.</p>
+                </div>
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                  {chapters.map((chapter) => (
+                    <div key={chapter.id} className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 p-6 border border-green-100">
+                      <div className="flex items-center gap-3 mb-4">
+                        <div className="bg-green-100 rounded-full p-3">
+                          <MapPin className="text-green-600" size={24} />
+                        </div>
+                        <div>
+                          <h4 className="text-xl font-bold text-gray-800">{chapter.name}</h4>
+                          <p className="text-sm text-green-600 font-medium">{chapter.location}</p>
+                        </div>
+                      </div>
+                      <p className="text-gray-600 leading-relaxed mb-4">{chapter.description}</p>
+                      <button className="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white py-2 px-4 rounded-lg hover:from-green-600 hover:to-emerald-700 transition-all font-semibold">
+                        Join Chapter
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </section>
+          )}
         </div>
       )}
 
@@ -922,6 +1034,190 @@ const YSPWebsite = () => {
                 </table>
               </div>
             </div>
+
+            {/* Chapter Management Section */}
+            <div className="bg-white rounded-xl shadow-lg p-6 md:p-8 border border-gray-100">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="bg-green-100 rounded-lg p-2">
+                    <MapPin className="text-green-600" size={24} />
+                  </div>
+                  <h3 className="text-xl md:text-2xl font-bold text-gray-800">Manage Chapters</h3>
+                </div>
+                <button
+                  onClick={() => window.open('https://forms.gle/cWPsgBJKLaQoLuUr8?fbclid=IwY2xjawOKRLJleHRuA2FlbQIxMABicmlkETFJWDhJY0U1azBWMDFLOXh2c3J0YwZhcHBfaWQQMjIyMDM5MTc4ODIwMDg5MgABHm01_q8ZFNsR30YIkD2ODzju7eleolSNiJgUoZKW11PV7HAc0NeXszwCRjFU_aem_2mVtlAdu6_smAMkowigvAA')}
+                  className="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-4 py-2 rounded-lg font-semibold hover:from-green-600 hover:to-emerald-700 transition-all shadow-md hover:shadow-lg flex items-center gap-2"
+                >
+                  <Plus size={20} /> Create Chapter via Google Form
+                </button>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                <input
+                  type="text"
+                  placeholder="Chapter Name"
+                  value={newChapter.name}
+                  onChange={(e) => setNewChapter({ ...newChapter, name: e.target.value })}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition"
+                />
+                <input
+                  type="text"
+                  placeholder="Location"
+                  value={newChapter.location}
+                  onChange={(e) => setNewChapter({ ...newChapter, location: e.target.value })}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition"
+                />
+                <button onClick={addChapter} className="bg-gradient-to-r from-green-500 to-emerald-600 text-white py-3 rounded-lg font-semibold flex items-center justify-center gap-2 hover:from-green-600 hover:to-emerald-700 transition-all shadow-md hover:shadow-lg">
+                  <Plus size={20} /> Add Chapter
+                </button>
+              </div>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
+                <textarea
+                  placeholder="Enter chapter description"
+                  value={newChapter.description}
+                  onChange={(e) => setNewChapter({ ...newChapter, description: e.target.value })}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition h-24 resize-none"
+                />
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="bg-gray-100">
+                      <th className="border p-3 text-left">Chapter Name</th>
+                      <th className="border p-3 text-left">Location</th>
+                      <th className="border p-3 text-left">Description</th>
+                      <th className="border p-3 text-left">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {chapters.length > 0 ? (
+                      chapters.map(chapter => (
+                        <tr key={chapter.id}>
+                          <td className="border p-3">
+                            {editingChapter === chapter.id ? (
+                              <input
+                                type="text"
+                                defaultValue={chapter.name}
+                                onChange={(e) => updateChapter(chapter.id, { name: e.target.value })}
+                                className="w-full p-2 border rounded"
+                              />
+                            ) : (
+                              chapter.name
+                            )}
+                          </td>
+                          <td className="border p-3">
+                            {editingChapter === chapter.id ? (
+                              <input
+                                type="text"
+                                defaultValue={chapter.location}
+                                onChange={(e) => updateChapter(chapter.id, { location: e.target.value })}
+                                className="w-full p-2 border rounded"
+                              />
+                            ) : (
+                              chapter.location
+                            )}
+                          </td>
+                          <td className="border p-3">
+                            {editingChapter === chapter.id ? (
+                              <textarea
+                                defaultValue={chapter.description}
+                                onChange={(e) => updateChapter(chapter.id, { description: e.target.value })}
+                                className="w-full p-2 border rounded h-16"
+                              />
+                            ) : (
+                              chapter.description
+                            )}
+                          </td>
+                          <td className="border p-3">
+                            {editingChapter === chapter.id ? (
+                              <button onClick={() => saveChapter(chapter.id)} className="bg-green-600 text-white px-3 py-1 rounded flex items-center gap-1 text-sm">
+                                <Save size={16} /> Save
+                              </button>
+                            ) : (
+                              <div className="flex gap-2">
+                                <button onClick={() => setEditingChapter(chapter.id)} className="bg-blue-600 text-white px-3 py-1 rounded flex items-center gap-1 text-sm">
+                                  <Edit2 size={16} /> Edit
+                                </button>
+                                <button onClick={() => deleteChapter(chapter.id)} className="bg-red-600 text-white px-3 py-1 rounded flex items-center gap-1 text-sm">
+                                  <Trash2 size={16} /> Delete
+                                </button>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan="4" className="border p-3 text-center text-gray-500">No chapters yet. Add one to get started.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Chapter Applications Management Section */}
+            <div className="bg-white rounded-xl shadow-lg p-6 md:p-8 border border-gray-100">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="bg-purple-100 rounded-lg p-2">
+                  <Users className="text-purple-600" size={24} />
+                </div>
+                <h3 className="text-xl md:text-2xl font-bold text-gray-800">Chapter Applications</h3>
+              </div>
+              <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
+                {chapterApplications.length > 0 ? (
+                  chapterApplications.map(app => (
+                    <div key={app.id} className="border border-gray-200 rounded-lg p-4 hover:border-purple-300 transition-colors">
+                      <div className="flex justify-between items-start mb-3">
+                        <div>
+                          <h4 className="font-bold text-lg text-gray-800">{app.name}</h4>
+                          <p className="text-sm text-gray-600">Location: {app.location}</p>
+                          <p className="text-sm text-gray-600">Applicant: {app.applicantName} ({app.applicantEmail})</p>
+                          <p className="text-xs text-gray-500 mt-1">Submitted: {new Date(app.submittedAt).toLocaleDateString()}</p>
+                        </div>
+                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                          app.status === 'approved'
+                            ? 'bg-green-100 text-green-700'
+                            : app.status === 'rejected'
+                            ? 'bg-red-100 text-red-700'
+                            : 'bg-yellow-100 text-yellow-700'
+                        }`}>
+                          {app.status.charAt(0).toUpperCase() + app.status.slice(1)}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-600 mb-3">{app.description}</p>
+                      {app.status === 'pending' && (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => approveChapterApplication(app.id)}
+                            className="bg-green-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm hover:bg-green-700 transition"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                            Approve
+                          </button>
+                          <button
+                            onClick={() => rejectChapterApplication(app.id)}
+                            className="bg-red-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm hover:bg-red-700 transition"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                            Reject
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-8">
+                    <Users className="text-gray-300 mx-auto mb-3" size={48} />
+                    <p className="text-gray-500">No chapter applications yet.</p>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -1056,6 +1352,102 @@ const YSPWebsite = () => {
                 <h3 className="text-xl font-semibold text-gray-800 mb-4">About This Program</h3>
                 <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">{selectedProgram.description}</p>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Chapter Application Modal */}
+      {showChapterApplicationForm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-gray-200 p-4 flex justify-between items-center">
+              <h2 className="text-2xl font-bold text-gray-800">Apply to Start a Chapter</h2>
+              <button
+                onClick={() => {
+                  setShowChapterApplicationForm(false);
+                  setChapterApplicationSubmitted(false);
+                }}
+                className="text-gray-500 hover:text-gray-700 transition"
+              >
+                <X size={24} />
+              </button>
+            </div>
+            <div className="p-6">
+              {!chapterApplicationSubmitted ? (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Your Name</label>
+                    <input
+                      type="text"
+                      value={newChapterApplication.applicantName}
+                      onChange={(e) => setNewChapterApplication({ ...newChapterApplication, applicantName: e.target.value })}
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition"
+                      placeholder="Enter your full name"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Your Email</label>
+                    <input
+                      type="email"
+                      value={newChapterApplication.applicantEmail}
+                      onChange={(e) => setNewChapterApplication({ ...newChapterApplication, applicantEmail: e.target.value })}
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition"
+                      placeholder="Enter your email address"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Chapter Name</label>
+                    <input
+                      type="text"
+                      value={newChapterApplication.name}
+                      onChange={(e) => setNewChapterApplication({ ...newChapterApplication, name: e.target.value })}
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition"
+                      placeholder="Enter the proposed chapter name"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Chapter Location</label>
+                    <input
+                      type="text"
+                      value={newChapterApplication.location}
+                      onChange={(e) => setNewChapterApplication({ ...newChapterApplication, location: e.target.value })}
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition"
+                      placeholder="Enter the chapter location"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Chapter Description</label>
+                    <textarea
+                      value={newChapterApplication.description}
+                      onChange={(e) => setNewChapterApplication({ ...newChapterApplication, description: e.target.value })}
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition h-24 resize-none"
+                      placeholder="Describe the purpose and goals of this chapter"
+                    />
+                  </div>
+                  <button
+                    onClick={handleChapterApplication}
+                    className="w-full bg-gradient-to-r from-amber-500 to-orange-600 text-white py-3 rounded-lg font-semibold hover:from-amber-600 hover:to-orange-700 transition-all shadow-md hover:shadow-lg"
+                  >
+                    Submit Application
+                  </button>
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <div className="bg-green-100 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+                    <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <h4 className="text-xl font-bold text-gray-800 mb-2">Application Submitted!</h4>
+                  <p className="text-gray-600 mb-4">Thank you for your interest! Your chapter application has been submitted and is pending approval from our admin team.</p>
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                    <p className="text-sm text-amber-800">
+                      <strong>Note:</strong> We will review your application and get back to you within 3-5 business days.
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
